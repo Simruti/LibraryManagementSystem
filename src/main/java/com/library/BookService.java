@@ -1,15 +1,46 @@
 package com.library;
 
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class BookService {
-    private List<Book> books = new ArrayList<>();
 
     public void addBook(Book book)
     {
-        books.add(book);
+        try
+        {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/library","root","");
+            String query = "INSERT INTO book(isbn,title,author,publication_year) VALUES (?,?,?,?)";
+            PreparedStatement statement = con.prepareStatement(query);
+            statement.setInt(1,book.getIsbn());
+            statement.setString(2,book.getTitle());
+            statement.setString(3, book.getAuthor());
+            statement.setInt(4, book.getPublicationYear());
+
+            statement.executeUpdate();
+            System.out.println("Book added to database Successfully");
+
+            statement.close();
+            con.close();
+
+
+        }catch (SQLException e)
+        {
+            System.out.println(e.getMessage());
+        } catch (ClassNotFoundException e) {
+            System.out.println("Class Not Found Exception"+e.getMessage());
+        }
     }
+
+    private List<Book> books = new ArrayList<>();
+
+
 
     public List<Book> getBooks()
     {

@@ -12,6 +12,11 @@ repositories {
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    // https://mvnrepository.com/artifact/com.mysql/mysql-connector-j
+    implementation group: 'com.mysql', name: 'mysql-connector-j', version: '8.2.0'
+    testImplementation 'org.mockito:mockito-core:4.10.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:4.10.0'
+
 }
 
 test {
