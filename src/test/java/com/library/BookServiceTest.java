@@ -11,7 +11,7 @@ public class BookServiceTest {
     {
         BookService bookService = new BookService();
         Book book = new Book(1,"Java Programming","Cay S. Horstmann",2001);
-        bookService.addBooks(book);
+        bookService.addBook(book);
 
         assertEquals(1,bookService.getBooks().size());
         assertEquals("Java Programming",bookService.getBooks().get(0).getTitle());
