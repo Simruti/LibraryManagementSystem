@@ -7,15 +7,15 @@ public class Book {
     private String title;
     private String author;
     private int publication_year;
-    private int no_of_copies;
+    private int copies_owned;
 
-    public Book(int isbn,String title, String author, int publication_year,int no_of_copies)
+    public Book(int isbn,String title, String author, int publication_year,int copies_owned)
     {
         this.isbn=isbn;
         this.title=title;
         this.author=author;
         this.publication_year=publication_year;
-        this.no_of_copies=no_of_copies;
+        this.copies_owned=copies_owned;
     }
 
     public int getIsbn(){
@@ -37,7 +37,7 @@ public class Book {
         return publication_year;
     }
 
-    public int getNo_of_copies(){ return no_of_copies; }
+    public int getCopies_owned(){ return copies_owned; }
 
     @Override
     public boolean equals(Object o) {
@@ -46,13 +46,13 @@ public class Book {
         Book book = (Book) o;
         return isbn == book.isbn &&
                 publication_year == book.publication_year &&
-                no_of_copies == book.no_of_copies &&
+                copies_owned == book.copies_owned &&
                 Objects.equals(title, book.title) &&
                 Objects.equals(author, book.author);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(isbn, title, author, publication_year, no_of_copies);
+        return Objects.hash(isbn, title, author, publication_year, copies_owned);
     }
 }
