@@ -15,6 +15,7 @@ import java.util.Scanner;
 
 import static java.sql.Types.NULL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -37,6 +38,9 @@ public class BookServiceTest {
 
     @Mock
     private PreparedStatement mockSelectPreparedStatement;
+
+    @Mock
+    private PreparedStatement mockUpdatePreparedStatement;
 
     @Mock
     private ResultSet mockResultSet;
@@ -119,9 +123,10 @@ public class BookServiceTest {
 
     @Test
     public void testGetBook() throws SQLException{
+
         List<Book> mockBooks = new ArrayList<>();
         mockBooks.add(new Book(1,"Java Programming","Herbert Schildt",2001,20));
-        mockBooks.add(new Book(2,"Core Java An Integrated Approach (Black Book","Dr. R. Nageswara Rao",2005,15));
+        mockBooks.add(new Book(2,"Core Java An Integrated Approach (Black Book)","Dr. R. Nageswara Rao",2005,15));
 
         when(mockResultSet.next()).thenReturn(true,true,false);
         when(mockResultSet.getInt("isbn")).thenReturn(1,2);
@@ -156,18 +161,18 @@ public class BookServiceTest {
         when(mockResultSet.getInt("copies_owned")).thenReturn(2);
 
         //To show available books
-        when(mockConnection.prepareStatement("SELECT b.isbn, b.title, b.author,b.publication_year, b.copies_owned - COUNT(bi.isbn) AS available_copies FROM Book b LEFT JOIN Book_Issue bi ON b.isbn = bi.isbn AND bi.return_date IS NULL GROUP BY b.isbn HAVING available_copies >= 1")).thenReturn(mockSelectPreparedStatement);
+        when(mockConnection.prepareStatement("SELECT b.isbn, b.title, b.author, b.copies_owned - COUNT(CASE WHEN bi.return_status = 0 THEN bi.isbn ELSE NULL END) AS availableCopies FROM book b LEFT JOIN book_issue bi ON b.isbn = bi.isbn GROUP BY b.isbn, b.title, b.author, b.copies_owned HAVING availableCopies > 0")).thenReturn(mockSelectPreparedStatement);
         when(mockSelectPreparedStatement.executeQuery()).thenReturn(mockResultSet);
 
         //Issue Book
-        when(mockConnection.prepareStatement("INSERT INTO book_issue (isbn, member_id, issue_date, return_date) VALUES (?, ?, ?, NULL)")).thenReturn(mockInsertPreparedStatement);
+        when(mockConnection.prepareStatement("INSERT INTO book_issue (isbn, member_id, issue_date, return_status) VALUES (?, ?, ?, 0)")).thenReturn(mockInsertPreparedStatement);
         when(mockInsertPreparedStatement.executeUpdate()).thenReturn(1);
 
         List<Book> books = bookService.issueBook();
         int isbn = 1;
         int memberId = 1;
 
-        verify(mockConnection,times(1)).prepareStatement("SELECT b.isbn, b.title, b.author,b.publication_year, b.copies_owned - COUNT(bi.isbn) AS available_copies FROM Book b LEFT JOIN Book_Issue bi ON b.isbn = bi.isbn AND bi.return_date IS NULL GROUP BY b.isbn HAVING available_copies >= 1");
+        verify(mockConnection,times(1)).prepareStatement("SELECT b.isbn, b.title, b.author, b.copies_owned - COUNT(CASE WHEN bi.return_status = 0 THEN bi.isbn ELSE NULL END) AS availableCopies FROM book b LEFT JOIN book_issue bi ON b.isbn = bi.isbn GROUP BY b.isbn, b.title, b.author, b.copies_owned HAVING availableCopies > 0");
         verify(mockSelectPreparedStatement,times(1)).executeQuery();
         verify(mockResultSet,times(2)).next();
 
@@ -179,16 +184,53 @@ public class BookServiceTest {
 
 
 
-        verify(mockConnection,times(1)).prepareStatement("INSERT INTO book_issue (isbn, member_id, issue_date, return_date) VALUES (?, ?, ?, NULL)");
+        verify(mockConnection,times(1)).prepareStatement("INSERT INTO book_issue (isbn, member_id, issue_date, return_status) VALUES (?, ?, ?, 0)");
         verify(mockInsertPreparedStatement, times(1)).setInt(1,isbn);
         verify(mockInsertPreparedStatement,times(1)).setInt(2,memberId);
         verify(mockInsertPreparedStatement,times(1)).setDate(3, Date.valueOf(LocalDate.now()));
         verify(mockInsertPreparedStatement, times(1)).executeUpdate();
 
-        //verify(mockResultSet,times(1)).close();
-        //verify(mockSelectPreparedStatement,times(1)).close();
-        //verify(mockInsertPreparedStatement,times(1)).close();
-        //verify(mockConnection,times(1)).close();
+//        verify(mockResultSet,times(2)).next();
+//        verify(mockResultSet,times(1)).close();
+//        verify(mockSelectPreparedStatement,times(1)).close();
+//        verify(mockInsertPreparedStatement,times(1)).close();
+//        verify(mockConnection,times(1)).close();
+    }
+
+    @Test
+    public void testReturnBook() throws SQLException
+    {
+        when(mockResultSet.next()).thenReturn(true, false);
+        when(mockResultSet.getInt("isbn")).thenReturn(1);
+        when(mockResultSet.getString("title")).thenReturn("Java Programming");
+        when(mockResultSet.getString("author")).thenReturn("Herbert Schildt");
+        when(mockResultSet.getInt("publication_year")).thenReturn(2001);
+        when(mockResultSet.getInt("copies_owned")).thenReturn(2);
+
+        when(mockConnection.prepareStatement("SELECT b.isbn, b.title, b.author, b.copies_owned - COUNT(CASE WHEN bi.return_status = 0 THEN bi.isbn ELSE NULL END) AS availableCopies FROM book b LEFT JOIN book_issue bi ON b.isbn = bi.isbn GROUP BY b.isbn HAVING availableCopies > 0")).thenReturn(mockSelectPreparedStatement);
+        when(mockSelectPreparedStatement.executeQuery()).thenReturn(mockResultSet);
+
+
+        when(mockConnection.prepareStatement("UPDATE book_issue SET return_status = 1 WHERE isbn = ? AND member_id = ? AND return_status = 0")).thenReturn(mockUpdatePreparedStatement);
+        when(mockUpdatePreparedStatement.executeUpdate()).thenReturn(1);
+
+        int isbn = 1;
+        int memberId = 1;
+        boolean isReturned = bookService.returnBook(isbn, memberId);
+
+        verify(mockConnection, times(1)).prepareStatement("UPDATE book_issue SET return_status = 1 WHERE isbn = ? AND member_id = ? AND return_status = 0");
+        verify(mockUpdatePreparedStatement, times(1)).setInt(1, isbn);
+        verify(mockUpdatePreparedStatement, times(1)).setInt(2, memberId);
+        verify(mockUpdatePreparedStatement, times(1)).executeUpdate();
+
+        assertEquals(true, isReturned);
+
+        //verify(mockResultSet, times(1)).close();
+        //verify(mockSelectPreparedStatement, times(1)).close();
+        //verify(mockUpdatePreparedStatement, times(1)).close();
+        //verify(mockConnection, times(1)).close();
+
+
     }
 }
 

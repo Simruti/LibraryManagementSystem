@@ -103,7 +103,7 @@ public class BookService {
 
         try {
             Connection con = DbConnectivity.getConnection();
-            String getQuery = "SELECT b.isbn, b.title, b.author,b.publication_year, b.copies_owned - COUNT(bi.isbn) AS available_copies FROM Book b LEFT JOIN Book_Issue bi ON b.isbn = bi.isbn AND bi.return_date IS NULL GROUP BY b.isbn HAVING available_copies >= 1";
+            String getQuery = "SELECT b.isbn, b.title, b.author, b.copies_owned - COUNT(CASE WHEN bi.return_status = 0 THEN bi.isbn ELSE NULL END) AS availableCopies FROM book b LEFT JOIN book_issue bi ON b.isbn = bi.isbn GROUP BY b.isbn, b.title, b.author, b.copies_owned HAVING availableCopies > 0";
             PreparedStatement selectStatement = con.prepareStatement(getQuery);
             ResultSet resultSetBooks = selectStatement.executeQuery();
 
@@ -130,7 +130,7 @@ public class BookService {
                 System.out.println("Enter your Member ID: ");
                 int memberId = scanner.nextInt();
 
-                String issueQuery = "INSERT INTO book_issue (isbn, member_id, issue_date, return_date) VALUES (?, ?, ?, NULL)";
+                String issueQuery = "INSERT INTO book_issue (isbn, member_id, issue_date, return_status) VALUES (?, ?, ?, 0)";
                 PreparedStatement issueStatement = con.prepareStatement(issueQuery);
 
                 if (issueStatement == null) {
@@ -155,4 +155,22 @@ public class BookService {
         }
         return books;
     }
+
+    public boolean returnBook(int isbn, int memberId) throws SQLException {
+        try (Connection con = DbConnectivity.getConnection()) {
+            String updateQuery = "UPDATE book_issue SET return_status = 1 WHERE isbn = ? AND member_id = ? AND return_status = 0";
+            PreparedStatement updateStatement = con.prepareStatement(updateQuery);
+            updateStatement.setInt(1, isbn);
+            updateStatement.setInt(2, memberId);
+
+            int rowsAffected = updateStatement.executeUpdate();
+            updateStatement.close();
+
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            System.out.println("There is some Error: " + e.getMessage());
+            return false;
+        }
+    }
+
 }

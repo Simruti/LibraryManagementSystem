@@ -7,7 +7,7 @@ public class BookIssue {
     int isbn;
     int member_id;
     Date issue_date;
-    Date return_date;
+    boolean return_status;
 
     public BookIssue(int isbn, int member_id) {
         this.isbn = isbn;
@@ -27,8 +27,8 @@ public class BookIssue {
         return issue_date;
     }
 
-    public Date getReturn_date() {
-        return return_date;
+    public boolean getReturn_status() {
+        return return_status;
     }
 
 
