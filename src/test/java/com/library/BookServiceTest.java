@@ -7,13 +7,13 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.MockitoAnnotations;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
+import static java.sql.Types.NULL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -41,6 +41,9 @@ public class BookServiceTest {
     @Mock
     private ResultSet mockResultSet;
 
+    @Mock
+    private Scanner mockScanner;
+
     private MockedStatic<DbConnectivity> mockedStatic;
 
     @BeforeEach
@@ -48,18 +51,25 @@ public class BookServiceTest {
         MockitoAnnotations.openMocks(this);
         mockedStatic = mockStatic(DbConnectivity.class);
         mockedStatic.when(DbConnectivity::getConnection).thenReturn(mockConnection);
+
+        mockScanner = new Scanner("1\n1");
+
+        // For Add Book
         when(mockConnection.prepareStatement("SELECT * FROM book WHERE isbn = ?")).thenReturn(mockCheckPreparedStatement);
         when(mockCheckPreparedStatement.executeQuery()).thenReturn(mockResultSet);
 
-        when(mockConnection.prepareStatement("INSERT INTO book(isbn,title,author,publication_year,no_of_copies) VALUES (?,?,?,?,?)"))
+        when(mockConnection.prepareStatement("INSERT INTO book(isbn,title,author,publication_year,copies_owned) VALUES (?,?,?,?,?)"))
                 .thenReturn(mockInsertPreparedStatement);
 //        when(mockConnection.prepareStatement(any(String.class))).thenReturn(mockPreparedStatement);
 //        when(mockPreparedStatement.executeQuery()).thenReturn(mockResultSet);
 
+        // For Get Books
         when(mockConnection.prepareStatement("SELECT * FROM book")).thenReturn(mockSelectPreparedStatement);
         when(mockSelectPreparedStatement.executeQuery()).thenReturn(mockResultSet);
 
         bookService = new BookService();
+
+        bookService = new BookService(mockScanner);
     }
 
     @AfterEach
@@ -96,11 +106,12 @@ public class BookServiceTest {
         verify(mockCheckPreparedStatement, times(1)).setInt(1, book.getIsbn());
         verify(mockCheckPreparedStatement, times(1)).executeQuery();
 
-        verify(mockConnection, times(1)).prepareStatement("INSERT INTO book(isbn,title,author,publication_year,no_of_copies) VALUES (?,?,?,?,?)");
+        verify(mockConnection, times(1)).prepareStatement("INSERT INTO book(isbn,title,author,publication_year,copies_owned) VALUES (?,?,?,?,?)");
         verify(mockInsertPreparedStatement, times(1)).setInt(1, book.getIsbn());
         verify(mockInsertPreparedStatement, times(1)).setString(2, book.getTitle());
         verify(mockInsertPreparedStatement, times(1)).setString(3, book.getAuthor());
         verify(mockInsertPreparedStatement, times(1)).setInt(4, book.getPublicationYear());
+        verify(mockInsertPreparedStatement, times(1)).setInt(5, book.getCopies_owned());
         verify(mockInsertPreparedStatement, times(1)).executeUpdate();
         verify(mockInsertPreparedStatement, times(1)).close();
         verify(mockConnection, times(1)).close();
@@ -114,10 +125,10 @@ public class BookServiceTest {
 
         when(mockResultSet.next()).thenReturn(true,true,false);
         when(mockResultSet.getInt("isbn")).thenReturn(1,2);
-        when(mockResultSet.getString("title")).thenReturn("Java Programming","Core Java An Integrated Approach (Black Book");
+        when(mockResultSet.getString("title")).thenReturn("Java Programming","Core Java An Integrated Approach (Black Book)");
         when(mockResultSet.getString("author")).thenReturn("Herbert Schildt","Dr. R. Nageswara Rao");
         when(mockResultSet.getInt("publication_year")).thenReturn(2001,2005);
-        when(mockResultSet.getInt("no_of_copies")).thenReturn(20,15);
+        when(mockResultSet.getInt("copies_owned")).thenReturn(20,15);
 
         List<Book> books = bookService.getBooks();
 
@@ -132,6 +143,52 @@ public class BookServiceTest {
         assertEquals(2,books.size());
         assertEquals(mockBooks.get(0),books.get(0));
         assertEquals(mockBooks.get(1),books.get(1));
+    }
+
+    @Test
+    public void testIssueBook() throws SQLException
+    {
+        when(mockResultSet.next()).thenReturn(true, false);
+        when(mockResultSet.getInt("isbn")).thenReturn(1);
+        when(mockResultSet.getString("title")).thenReturn("Java Programming");
+        when(mockResultSet.getString("author")).thenReturn("Herbert Schildt");
+        when(mockResultSet.getInt("publication_year")).thenReturn(2001);
+        when(mockResultSet.getInt("copies_owned")).thenReturn(2);
+
+        //To show available books
+        when(mockConnection.prepareStatement("SELECT b.isbn, b.title, b.author,b.publication_year, b.copies_owned - COUNT(bi.isbn) AS available_copies FROM Book b LEFT JOIN Book_Issue bi ON b.isbn = bi.isbn AND bi.return_date IS NULL GROUP BY b.isbn HAVING available_copies >= 1")).thenReturn(mockSelectPreparedStatement);
+        when(mockSelectPreparedStatement.executeQuery()).thenReturn(mockResultSet);
+
+        //Issue Book
+        when(mockConnection.prepareStatement("INSERT INTO book_issue (isbn, member_id, issue_date, return_date) VALUES (?, ?, ?, NULL)")).thenReturn(mockInsertPreparedStatement);
+        when(mockInsertPreparedStatement.executeUpdate()).thenReturn(1);
+
+        List<Book> books = bookService.issueBook();
+        int isbn = 1;
+        int memberId = 1;
+
+        verify(mockConnection,times(1)).prepareStatement("SELECT b.isbn, b.title, b.author,b.publication_year, b.copies_owned - COUNT(bi.isbn) AS available_copies FROM Book b LEFT JOIN Book_Issue bi ON b.isbn = bi.isbn AND bi.return_date IS NULL GROUP BY b.isbn HAVING available_copies >= 1");
+        verify(mockSelectPreparedStatement,times(1)).executeQuery();
+        verify(mockResultSet,times(2)).next();
+
+        verify(mockResultSet).getInt("isbn");
+        verify(mockResultSet).getString("title");
+        verify(mockResultSet).getString("author");
+        verify(mockResultSet).getInt("publication_year");
+        verify(mockResultSet).getInt("copies_owned");
+
+
+
+        verify(mockConnection,times(1)).prepareStatement("INSERT INTO book_issue (isbn, member_id, issue_date, return_date) VALUES (?, ?, ?, NULL)");
+        verify(mockInsertPreparedStatement, times(1)).setInt(1,isbn);
+        verify(mockInsertPreparedStatement,times(1)).setInt(2,memberId);
+        verify(mockInsertPreparedStatement,times(1)).setDate(3, Date.valueOf(LocalDate.now()));
+        verify(mockInsertPreparedStatement, times(1)).executeUpdate();
+
+        //verify(mockResultSet,times(1)).close();
+        //verify(mockSelectPreparedStatement,times(1)).close();
+        //verify(mockInsertPreparedStatement,times(1)).close();
+        //verify(mockConnection,times(1)).close();
     }
 }
 
